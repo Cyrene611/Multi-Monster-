@@ -1,0 +1,270 @@
+-- =======================================================
+-- TỰ ĐỘNG TẢI VÀ PHÁT ÂM THANH TỪ GITHUB
+-- =======================================================
+local function GitAud(soundlink, filename)
+    local FileName = filename
+    if not isfile(FileName .. ".mp3") then
+        writefile(FileName .. ".mp3", game:HttpGet(soundlink))
+    end
+    return (getcustomasset or getsynasset)(FileName .. ".mp3")
+end
+
+local function CustomGitSound(soundlink, vol, filename, duration)
+    task.spawn(function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = GitAud(soundlink, filename)
+        sound.Parent = workspace
+        sound.Volume = vol
+        sound.Looped = false
+        sound:Play()
+        
+        task.wait(duration)
+        sound:Destroy()
+    end)
+end
+
+-- Kích hoạt âm thanh (Thời lượng 10 giây)
+CustomGitSound("https://github.com/Cyrene611/Pressure-Entity-Spawner/raw/refs/heads/main/MultiRipperSpawn.mp3", 3, "RipperMultiArrival", 10)
+
+-- =======================================================
+-- TỰ ĐỘNG TẠO ĐỐI TƯỢNG BỊ THIẾU
+-- =======================================================
+local lighting = game:GetService("Lighting")
+local mainCC = lighting:FindFirstChild("MainColorCorrection")
+
+if not mainCC then
+    mainCC = Instance.new("ColorCorrectionEffect")
+    mainCC.Name = "MainColorCorrection"
+    mainCC.Parent = lighting
+end
+
+-- =======================================================
+-- CẤU HÌNH VÀ HỆ THỐNG RUNG MÀN HÌNH (CAMERA SHAKER)
+-- =======================================================
+local ShakeConfig = {
+    Intensity = 0.5,        -- Độ mạnh/Khoảng cách lắc
+    SpeedMultiplier = 0.3   -- Tốc độ dập dềnh/Tần số rung
+}
+
+local function initializeBypassedShaker()
+    local playerCamera = workspace.CurrentCamera
+    if not playerCamera then return nil end
+
+    local currentCFrame = playerCamera.CFrame
+    local renderPriority = Enum.RenderPriority.Camera.Value + 1
+    
+    local shakerInstance = {
+        ["_running"] = false,
+        ["_renderName"] = "BypassedCameraShaker",
+        ["_renderPriority"] = renderPriority,
+        ["_camShakeInstances"] = {},
+        ["_removeInstances"] = {}
+    }
+
+    game:GetService("RunService"):BindToRenderStep(shakerInstance._renderName, shakerInstance._renderPriority, function(deltaTime)
+        playerCamera = workspace.CurrentCamera
+        if not playerCamera then return end
+        
+        currentCFrame = playerCamera.CFrame
+        local posAccumulator = Vector3.new()
+        local rotAccumulator = Vector3.new()
+        local instances = shakerInstance._camShakeInstances
+        
+        for i = 1, #instances do
+            local inst = instances[i]
+            if inst.currentFadeTime <= 0 and not inst.sustain then
+                shakerInstance._removeInstances[#shakerInstance._removeInstances + 1] = i
+            else
+                local deltaTick = inst.tick
+                local fadeTime = inst.currentFadeTime
+                local noiseVal = Vector3.new(math.noise(deltaTick, 0) * 0.5, math.noise(0, deltaTick) * 0.5, math.noise(deltaTick, deltaTick) * 0.5)
+                
+                if inst.fadeInDuration > 0 and inst.sustain then
+                    if fadeTime < 1 then
+                        fadeTime = fadeTime + deltaTime / inst.fadeInDuration
+                    else
+                        inst.sustain = false
+                    end
+                end
+                if not inst.sustain then
+                    fadeTime = fadeTime - deltaTime / inst.fadeOutDuration
+                end
+                
+                inst.tick = deltaTick + deltaTime * inst.Roughness * inst.roughMod * (inst.sustain and 1 or fadeTime)
+                inst.currentFadeTime = fadeTime
+                
+                local shakeVector = noiseVal * inst.Magnitude * inst.magnMod * fadeTime
+                posAccumulator = posAccumulator + shakeVector * inst.PositionInfluence
+                rotAccumulator = rotAccumulator + shakeVector * inst.RotationInfluence
+            end
+        end
+        
+        for i = #shakerInstance._removeInstances, 1, -1 do
+            table.remove(instances, shakerInstance._removeInstances[i])
+            shakerInstance._removeInstances[i] = nil
+        end
+        
+        local finalCFrame = CFrame.new(posAccumulator) 
+            * CFrame.Angles(0, math.rad(rotAccumulator.Y), 0) 
+            * CFrame.Angles(math.rad(rotAccumulator.X), 0, math.rad(rotAccumulator.Z))
+            
+        playerCamera.CFrame = currentCFrame * finalCFrame
+    end)
+
+    shakerInstance._running = true
+    return shakerInstance
+end
+
+local activeShaker = initializeBypassedShaker()
+
+local function shakeCamera(presetName)
+    if not activeShaker then return end
+
+    local presets = {
+        ["Bump"] = {Magnitude = 2.5, Roughness = 4, FadeIn = 0.1, FadeOut = 0.75, PosInf = Vector3.new(0.15, 0.15, 0.15), RotInf = Vector3.new(1, 1, 1)},
+        ["Explosion"] = {Magnitude = 5, Roughness = 10, FadeIn = 0, FadeOut = 1.5, PosInf = Vector3.new(0.25, 0.25, 0.25), RotInf = Vector3.new(4, 1, 1)},
+        ["Earthquake"] = {Magnitude = 0.6, Roughness = 3.5, FadeIn = 2, FadeOut = 10, PosInf = Vector3.new(0.25, 0.25, 0.25), RotInf = Vector3.new(1, 1, 4)},
+        ["BadTrip"] = {Magnitude = 10, Roughness = 0.15, FadeIn = 5, FadeOut = 10, PosInf = Vector3.new(0, 0, 0.15), RotInf = Vector3.new(2, 1, 4)},
+        ["HandheldCamera"] = {Magnitude = 1, Roughness = 0.25, FadeIn = 5, FadeOut = 10, PosInf = Vector3.new(0, 0, 0), RotInf = Vector3.new(1, 0.5, 0.5)},
+        ["Vibration"] = {Magnitude = 0.4, Roughness = 20, FadeIn = 2, FadeOut = 2, PosInf = Vector3.new(0, 0.15, 0), RotInf = Vector3.new(1.25, 0, 4)},
+        ["RoughDriving"] = {Magnitude = 2, Roughness = 3, FadeIn = 1, FadeOut = 1, PosInf = Vector3.new(0, 0, 0), RotInf = Vector3.new(1, 1, 1)}
+    }
+
+    local data = presets[presetName]
+    if not data then return end
+
+    table.insert(activeShaker._camShakeInstances, {
+        ["Magnitude"] = data.Magnitude,
+        ["Roughness"] = data.Roughness,
+        ["PositionInfluence"] = data.PosInf,
+        ["RotationInfluence"] = data.RotInf,
+        ["roughMod"] = ShakeConfig.SpeedMultiplier,
+        ["magnMod"] = ShakeConfig.Intensity,
+        ["fadeOutDuration"] = data.FadeOut,
+        ["fadeInDuration"] = data.FadeIn,
+        ["sustain"] = data.FadeIn > 0,
+        ["currentFadeTime"] = data.FadeIn > 0 and 0 or 1,
+        ["tick"] = Random.new():NextNumber(-100, 100)
+    })
+end
+
+-- =======================================================
+-- KÍCH HOẠT HIỆU ỨNG (RUNG + MÀU SẮC)
+-- =======================================================
+
+-- 1. Rung màn hình
+shakeCamera("Explosion")
+
+-- 2. Đổi màu ColorCorrection (1s vào, 10s ra)
+coroutine.wrap(function()
+    local tweenService = game:GetService("TweenService")
+    
+    local currentCC = lighting:FindFirstChild("MainColorCorrection")
+    if not currentCC or not currentCC.Parent then
+        currentCC = Instance.new("ColorCorrectionEffect")
+        currentCC.Name = "MainColorCorrection"
+        currentCC.Parent = lighting
+    end
+
+    currentCC.Contrast = 0
+    currentCC.Saturation = 0
+    currentCC.TintColor = Color3.fromRGB(255, 255, 255)
+
+    local fadeInInfo = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+    local fadeInTween = tweenService:Create(currentCC, fadeInInfo, {
+        TintColor = Color3.fromRGB(255, 2, 2),
+        Contrast = 0.1,
+        Saturation = -0.5
+    })
+    
+    fadeInTween:Play()
+    fadeInTween.Completed:Wait()
+
+    if currentCC and currentCC.Parent then
+        local fadeOutInfo = TweenInfo.new(10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local fadeOutTween = tweenService:Create(currentCC, fadeOutInfo, {
+            TintColor = Color3.fromRGB(255, 255, 255),
+            Contrast = 0,
+            Saturation = 0
+        })
+        fadeOutTween:Play()
+    end
+end)()
+
+-- 3. Đổi màu đèn/neon trong phòng hiện tại
+task.spawn(function()
+    local Config = {
+        TargetColor = Color3.fromRGB(240, 0, 0), 
+        TweenTime = 2,                         
+    }
+
+    local Workspace = workspace
+    local Players = game:GetService("Players")
+    local TweenService = game:GetService("TweenService") 
+    local LocalPlayer = Players.LocalPlayer
+    
+    local roomsFolder = Workspace:FindFirstChild("GameplayFolder") and Workspace.GameplayFolder:FindFirstChild("Rooms")
+    if not roomsFolder then return end
+
+    local tweenInfo = TweenInfo.new(Config.TweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart", 10)
+    if not rootPart then return end
+
+    local currentRoom = nil
+
+    local touchingParts = Workspace:GetPartsInPart(rootPart)
+    for i = 1, #touchingParts do
+        local current = touchingParts[i]
+        while current and current.Parent do
+            if current.Parent == roomsFolder and current:IsA("Model") then
+                currentRoom = current
+                break
+            end
+            current = current.Parent
+        end
+        if currentRoom then break end
+    end
+
+    if not currentRoom then
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        raycastParams.FilterDescendantsInstances = {character}
+        local rayResult = Workspace:Raycast(rootPart.Position, Vector3.new(0, -20, 0), raycastParams)
+        
+        if rayResult and rayResult.Instance then
+            local current = rayResult.Instance
+            while current and current.Parent do
+                if current.Parent == roomsFolder and current:IsA("Model") then
+                    currentRoom = current
+                    break
+                end
+                current = current.Parent
+            end
+        end
+    end
+
+    if currentRoom then
+        local descendants = currentRoom:GetDescendants()
+        for i = 1, #descendants do
+            local obj = descendants[i]
+            
+            if obj:IsA("Light") then
+                local path = obj:GetFullName()
+                if path:find("%.Lights") or path:find("neon") or path:find("nec") then
+                    obj.Enabled = true
+                    TweenService:Create(obj, tweenInfo, {Color = Config.TargetColor}):Play() 
+                end
+            
+            elseif obj:IsA("MeshPart") or obj:IsA("BasePart") then
+                local nameLower = obj.Name:lower()
+                if nameLower == "neon" or nameLower == "smallneon" or nameLower == "nec" then
+                    obj.Material = Enum.Material.Neon 
+                    TweenService:Create(obj, tweenInfo, {Color = Config.TargetColor}):Play() 
+                end
+            end
+        end
+    end
+end)
+
