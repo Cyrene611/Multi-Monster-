@@ -1,0 +1,165 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local GameplayFolder = workspace:WaitForChild("GameplayFolder")
+
+local SEARCH_RADIUS = 200 -- Bán kính 200 stud quanh người chơi
+local SOUND_ID = "rbxassetid://136009376214179"
+
+-- CHỈ các Model chứa chính xác từ khóa này mới bị dính hiệu ứng
+local whitelist = {
+	"hadal crate",
+	"worklight",
+	"scaffolding",
+	"drawer",
+	"itemlocker",
+	"lockershelf"
+}
+
+-- Danh sách vật phẩm bảo vệ tuyệt đối
+local protectedItems = {
+	"normalkeycard",
+	"ridgekeycard",
+	"innerkeycard",
+	"password paper",
+	"passwordpaper"
+}
+
+-- Kiểm tra Whitelist
+local function isWhitelisted(object)
+	local name = string.lower(object.Name)
+	-- BẢO VỆ TỦ TRỐN
+	if string.find(name, "hiding", 1, true) then
+		return false
+	end
+	for _, keyword in ipairs(whitelist) do
+		if string.find(name, keyword, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Kiểm tra sự tồn tại của vật phẩm quan trọng
+local function hasProtectedItem(model)
+	for _, desc in ipairs(model:GetDescendants()) do
+		local descName = string.lower(desc.Name)
+		for _, itemName in ipairs(protectedItems) do
+			if descName == itemName or string.find(descName, itemName, 1, true) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- ÁP DỤNG HIỆU ỨNG NEON ĐỎ, PHÓNG TO VÀ THU NHỎ
+local function applyRedNeonEffect(model)
+	if not model:IsA("Model") then return end
+	if not isWhitelisted(model) then return end
+	if hasProtectedItem(model) then return end
+	if model:GetAttribute("EffectApplied") then return end
+	model:SetAttribute("EffectApplied", true)
+
+	local parts = {}
+	for _, v in ipairs(model:GetDescendants()) do
+		if v:IsA("BasePart") then
+			table.insert(parts, v)
+		end
+	end
+
+	if #parts == 0 then return end
+
+	-- PHÁT ÂM THANH 3D
+	local primary = model.PrimaryPart or parts[1]
+	if primary and math.random() <= 0.99 then
+		local sound = Instance.new("Sound")
+		sound.Name = "EffectSound3D"
+		sound.SoundId = SOUND_ID
+		sound.RollOffMinDistance = 15
+		sound.RollOffMaxDistance = 120
+		sound.RollOffMode = Enum.RollOffMode.Inverse
+		sound.Volume = math.random(50, 70) / 10 -- Tăng âm lượng lên to hơn (3.5 - 5.0)
+
+		-- HIỆU ỨNG PITCH THẤP (Không dùng PlaybackSpeed)
+		local pitchEffect = Instance.new("PitchShiftSoundEffect")
+		pitchEffect.Octave = math.random(65, 80) / 100 -- Giảm Pitch thấp hơn bình thường (0.65 - 0.80)
+		pitchEffect.Parent = sound
+
+		sound.Parent = primary
+
+		pcall(function() sound:Play() end)
+		sound.Ended:Connect(function()
+			pcall(function() sound:Destroy() end)
+		end)
+	end
+
+	-- THÔNG SỐ TWEEN (Chuyển động mượt)
+	local tweenInfoIn = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local tweenInfoOut = TweenInfo.new(4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+	-- Thực hiện trên từng bộ phận của Model
+	for _, part in ipairs(parts) do
+		pcall(function()
+			-- Đổi vật liệu thành Neon màu Đỏ
+			part.Material = Enum.Material.Neon
+			part.Color = Color3.fromRGB(255, 0, 0)
+
+			local originalSize = part.Size
+			local targetSize = originalSize * 1.15
+
+			-- Tween 1: To ra 1.15 lần mượt trong 0.1s
+			local tweenExpand = TweenService:Create(part, tweenInfoIn, { Size = targetSize })
+			-- Tween 2: Thu nhỏ về Vector3.zero mượt trong 4s
+			local tweenShrink = TweenService:Create(part, tweenInfoOut, { Size = Vector3.new(0, 0, 0) })
+
+			tweenExpand:Play()
+			tweenExpand.Completed:Connect(function()
+				tweenShrink:Play()
+			end)
+		end)
+	end
+
+	-- Dọn dẹp xóa Model sau khi thu nhỏ xong
+	task.delay(4, function()
+		if model and model.Parent then
+			pcall(function()
+				model:Destroy()
+			end)
+		end
+	end)
+end
+
+-- ========================================== --
+-- CHẠY DUY NHẤT 1 LẦN TRONG BÁN KÍNH 200 STUD --
+-- ========================================== --
+local function runOnceInRadius()
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local playerPos = hrp.Position
+	local targets = {}
+
+	for _, v in ipairs(GameplayFolder:GetDescendants()) do
+		if v:IsA("Model") then
+			local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
+			if primary then
+				local dist = (primary.Position - playerPos).Magnitude
+				if dist <= SEARCH_RADIUS then
+					table.insert(targets, v)
+				end
+			end
+		end
+	end
+
+	-- Delay ngẫu nhiên từ 0.0 đến 1.0 giây trước khi biến đổi đồng loạt
+	for _, model in ipairs(targets) do
+		local randomDelay = math.random() * 1
+		task.delay(randomDelay, function()
+			applyRedNeonEffect(model)
+		end)
+	end
+end
+
+runOnceInRadius()
