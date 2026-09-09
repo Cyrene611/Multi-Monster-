@@ -24,7 +24,7 @@ local function CustomGitSound(soundlink, vol, filename, duration)
 end
 
 -- Kích hoạt âm thanh (Thời lượng 10 giây)
-CustomGitSound("https://github.com/Cyrene611/Pressure-Entity-Spawner/raw/refs/heads/main/MultiRipperSpawn.mp3", 3, "RipperMultiArrival", 10)
+CustomGitSound("https://github.com/Cyrene611/Multi-Monster-/raw/refs/heads/main/MultiRipperSpawn_1.mp3", 3, "RipperMultiArrival2", 10)
 
 -- =======================================================
 -- TỰ ĐỘNG TẠO ĐỐI TƯỢNG BỊ THIẾU
