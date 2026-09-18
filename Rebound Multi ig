@@ -24,7 +24,7 @@ local SoundFarId = GitAud("https://github.com/Cyrene611/Multi-Monster-/raw/refs/
 local SoundRespawnId = GitAud("https://github.com/Cyrene611/Multi-Monster-/raw/refs/heads/main/MultiReboundSpawn.mp3", "A60_Spawn")
 
 -- =====================================================================
--- HÀM DỌN SẠCH CÁC PART / SCRIPT LIÊN QUAN ĐẾN NGƯỜI CHƠI TRONG MODEL
+-- HÀM DỌN SẠCH CÁC PART / SCRIPT LIÊN QUAN ĐẾN NGƯỜI CHƠI TRONG MODEL & ANCHOR
 -- =====================================================================
 local function cleanPlayerParts(model)
     local function processInstance(v)
@@ -34,11 +34,12 @@ local function cleanPlayerParts(model)
         -- Xóa sự kiện va chạm cảm ứng
         elseif v:IsA("TouchInterest") then
             v:Destroy()
-        -- Tắt hẳn va chạm vật lý và va chạm cảm ứng với Player
+        -- Tắt hẳn va chạm vật lý, va chạm cảm ứng với Player và Anchor chống rơi Void
         elseif v:IsA("BasePart") then
             v.CanCollide = false
             v.CanTouch = false
             v.CanQuery = false
+            v.Anchored = true
         end
     end
 
@@ -65,7 +66,7 @@ task.spawn(function()
     -- 🔊 2. Lắng nghe workspace để gắn Sound 3D & Dọn dẹp Model khi vừa xuất hiện
     local entityModel = workspace:WaitForChild("A60ReboundChild", 10)
     if entityModel then
-        cleanPlayerParts(entityModel) -- Xóa sạch script/part liên quan đến player
+        cleanPlayerParts(entityModel) -- Xóa sạch script/part liên quan đến player & Anchor model
 
         local entityRoot = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart") or entityModel:WaitForChild("HumanoidRootPart", 5)
         if entityRoot then
@@ -89,7 +90,7 @@ end)
 local spawnEntity = loadstring(game:HttpGet("https://codeberg.org/qjjdjdjjd/Pressure-Files/raw/branch/main/Pressure-Entity-Spawner"))()
 
 spawnEntity({
-    AssetId = "https://github.com/Cyrene611/Pressure-Entity-Spawner/raw/refs/heads/main/A-6000.rbxmx",
+    AssetId = "rbxassetid://78614439753159",
     EntityName = "A60ReboundChild",
     MoveSpeed = 65,
     HitboxRadius = 32,
