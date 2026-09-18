@@ -111,7 +111,7 @@ spawnEntity({
     RoomLimits = false,
     RoomLimitValue = 5,
     EntityLifeTime = "10",
-    YOffset = Vector3.new(0, 2, 0),
+    YOffset = Vector3.new(0, 0, 0),
     DespawnYOffset = Vector3.new(0, 30, 0),
     Tolerance = 0.1,
     FlickerSpeed = 75,
